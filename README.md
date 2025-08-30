@@ -31,18 +31,20 @@ Ejecutar SQL:
 psql -U postgres -f init_db.sql
 
 Luego inicializar tablas:
-
+```
 make init_db
-
+```
 2️⃣ Scrappear reseñas
+```
 make scrape
-
+```
 
 Scrapea bares y restaurantes de Buenos Aires y guarda las reseñas en la base de datos. Si no hay datos reales, se usan ejemplos.
 
 3️⃣ Generar topics y H3
+```
 make topic
-
+```
 
 Limpia y preprocesa los textos.
 
@@ -51,8 +53,9 @@ Aplica BERTopic para generar topics automáticos.
 Calcula el índice geoespacial H3 para cada reseña.
 
 4️⃣ Ejecutar servidor FastAPI
+```
 make run
-
+```
 
 Endpoints:
 
