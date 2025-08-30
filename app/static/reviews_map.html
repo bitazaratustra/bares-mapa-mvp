@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mapa de Bares Buenos Aires</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link 
+      rel="stylesheet" 
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-sA+oZb7pFtkpP0uJ4+F2q+3Gg+h4xM3b8yZg2H/3i0s="
+      crossorigin=""
+    />
+    <style>
+      #map { height: 100vh; }
+      .topic-filter { position: absolute; top: 10px; left: 50px; z-index: 1000; background: white; padding: 5px; }
+    </style>
+</head>
+<body>
+    <div class="topic-filter">
+        <label>Filtrar topic: 
+            <select id="topicSelect">
+                <option value="">Todos</option>
+            </select>
+        </label>
+        <button onclick="loadMap()">Filtrar</button>
+    </div>
+    <div id="map"></div>
+
+    <script 
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-o9N1jV+f8Z+6nHdzX+qg51/3FhC7Ew1+vYkRROqTi1M="
+      crossorigin="">
+    </script>
+    <script src="https://unpkg.com/h3-js"></script>
+    <script>
+        const map = L.map('map').setView([-34.60, -58.38], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19
+        }).addTo(map);
+
+        let currentLayer;
+
+        async function fetchData(topic = "") {
+            let url = "/maps";
+            if (topic) url += "?topic_filter=" + topic;
+            const res = await fetch(url);
+            const data = await res.json();
+            return data;
+        }
+
+        function h3ToPolygon(h3Index) {
+            const boundary = h3.h3ToGeoBoundary(h3Index, true);
+            return boundary.map(coord => [coord[0], coord[1]]);
+        }
+
+        async function loadMap() {
+            const topic = document.getElementById("topicSelect").value;
+            const data = await fetchData(topic);
+
+            // Limpiar capa anterior
+            if (currentLayer) {
+                map.removeLayer(currentLayer);
+            }
+
+            currentLayer = L.layerGroup();
+            const topicsSet = new Set();
+
+            for (const [h3Index, reviews] of Object.entries(data)) {
+                const polygon = h3ToPolygon(h3Index);
+                const popupContent = reviews.map(r => `<b>${r.name}</b><br>${r.text}<br>Rating: ${r.rating}`).join("<hr>");
+                L.polygon(polygon, {color: 'blue', weight: 1, fillOpacity: 0.3})
+                    .bindPopup(popupContent)
+                    .addTo(currentLayer);
+
+                // Guardamos los topics para el filtro
+                reviews.forEach(r => topicsSet.add(r.topic));
+            }
+
+            currentLayer.addTo(map);
+
+            // Llenar select de topics
+            const select = document.getElementById("topicSelect");
+            select.innerHTML = '<option value="">Todos</option>';
+            [...topicsSet].forEach(t => {
+                const option = document.createElement("option");
+                option.value = t;
+                option.text = t;
+                select.appendChild(option);
+            });
+        }
+
+        // Cargar mapa inicial
+        loadMap();
+    </script>
+</body>
+</html>

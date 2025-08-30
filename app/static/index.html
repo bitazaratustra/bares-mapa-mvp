@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bares BA - Mapa de Reseñas</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        header {
+            background: #2c3e50;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+        .filters {
+            background: #f8f9fa;
+            padding: 1rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        #map {
+            flex: 1;
+            width: 100%;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        input, select {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Bares BA - Mapa de Reseñas</h1>
+            <p>Visualiza y filtra reseñas de bares en Buenos Aires</p>
+        </header>
+        <div class="filters">
+            <div class="filter-group">
+                <label for="rating">Rating mínimo:</label>
+                <input type="number" id="rating" min="1" max="5" step="0.5" value="3">
+            </div>
+            <div class="filter-group">
+                <label for="searchText">Buscar en reseñas:</label>
+                <input type="text" id="searchText" placeholder="Palabra clave...">
+            </div>
+            <button onclick="applyFilters()">Filtrar</button>
+        </div>
+        <div id="map"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        // Variables globales
+        let map, markers = [], reviews = [];
+        
+        // Inicializar mapa
+        function initMap() {
+            console.log('Inicializando mapa...');
+            map = L.map('map').setView([-34.6037, -58.3816], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            loadReviews();
+        }
+
+        // Cargar reseñas desde la API
+        async function loadReviews() {
+            try {
+                console.log('Cargando reseñas...');
+                const response = await fetch('/reviews/reviews_json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                console.log('Reseñas cargadas:', data.length);
+                reviews = data;
+                showReviews(reviews);
+            } catch (error) {
+                console.error('Error cargando reseñas:', error);
+                alert('Error cargando reseñas. Por favor, recarga la página.');
+            }
+        }
+
+        // Mostrar reseñas en el mapa
+        function showReviews(reviewsToShow) {
+            console.log(`Mostrando ${reviewsToShow.length} reseñas en el mapa...`);
+            
+            // Limpiar marcadores existentes
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+
+            // Agregar nuevos marcadores
+            reviewsToShow.forEach(r => {
+                if (r.lat && r.lon) {
+                    const marker = L.marker([r.lat, r.lon])
+                        .bindPopup(`
+                            <strong>${r.name}</strong><br>
+                            Rating: ${r.rating}<br>
+                            <em>${r.text}</em>
+                        `);
+                    markers.push(marker);
+                    marker.addTo(map);
+                }
+            });
+            
+            // Ajustar el zoom para mostrar todos los marcadores si hay alguno
+            if (markers.length > 0) {
+                const group = L.featureGroup(markers);
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+
+        // Aplicar filtros
+        function applyFilters() {
+            console.log('Aplicando filtros...');
+            const minRating = parseFloat(document.getElementById('rating').value) || 0;
+            const searchText = document.getElementById('searchText').value.toLowerCase();
+            console.log('Filtros:', { minRating, searchText });
+            console.log('Total reseñas antes de filtrar:', reviews.length);
+
+            const filtered = reviews.filter(r => {
+                const matchesRating = r.rating >= minRating;
+                const matchesText = !searchText || 
+                    (r.text && r.text.toLowerCase().includes(searchText)) ||
+                    (r.name && r.name.toLowerCase().includes(searchText));
+                return matchesRating && matchesText;
+            });
+
+            console.log('Reseñas filtradas:', filtered.length);
+            showReviews(filtered);
+            
+            // Mostrar feedback al usuario
+            const message = `Mostrando ${filtered.length} resultados de ${reviews.length} reseñas`;
+            document.querySelector('.filters').insertAdjacentHTML('beforeend', 
+                `<div id="filter-result" style="margin-top: 10px; color: #666;">${message}</div>`);
+            
+            // Limpiar el mensaje después de 3 segundos
+            setTimeout(() => {
+                const elem = document.getElementById('filter-result');
+                if (elem) elem.remove();
+            }, 3000);
+        }
+
+        // Agregar listener para la tecla Enter en el campo de búsqueda
+        document.getElementById('searchText').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                applyFilters();
+            }
+        });
+
+        // Iniciar la aplicación
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM cargado, iniciando aplicación...');
+            initMap();
+        });
+    </script>
+</body>
+</html>
