@@ -10,33 +10,6 @@ Este proyecto es un **MVP de minería de textos y visualización geoespacial** d
 
 ---
 
-## 📁 Estructura del proyecto
-
-bares-mapa-mvp/
-├── app/
-│ ├── main.py
-│ ├── routes/
-│ │ ├── reviews.py
-│ │ └── maps.py
-│ ├── db/
-│ │ ├── database.py
-│ │ └── init_db.py
-│ ├── services/
-│ │ ├── serpapi_client.py
-│ │ ├── scrape_utils.py
-│ │ ├── export_reviews.py
-│ │ └── topic_model.py
-│ └── static/
-│ └── reviews_map.html
-├── requirements.txt
-├── Makefile
-├── README.md
-└── .gitignore
-
-
-
----
-
 ## ⚙️ Requisitos
 
 - Python 3.10+
@@ -49,15 +22,13 @@ Instalación de dependencias:
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-
+```
 
 🛠️ Flujo de trabajo
 1️⃣ Inicializar la base de datos
 
 Ejecutar SQL:
-
 psql -U postgres -f init_db.sql
-
 
 Luego inicializar tablas:
 
