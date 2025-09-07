@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from app.routes.reviews import router as reviews_router
 from app.routes.maps import router as maps_router
 
@@ -10,3 +11,7 @@ app.include_router(maps_router, prefix="/maps")
 
 # Servir archivos estáticos (mapa)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+@app.get("/")
+def read_root():
+    return FileResponse("app/static/index.html")

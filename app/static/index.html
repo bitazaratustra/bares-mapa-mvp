@@ -10,6 +10,7 @@
             margin: 0;
             padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            color: #333;
         }
         .container {
             display: flex;
@@ -30,15 +31,59 @@
             align-items: center;
             justify-content: center;
             flex-wrap: wrap;
+            border-bottom: 1px solid #dee2e6;
         }
         .filter-group {
             display: flex;
             align-items: center;
             gap: 0.5rem;
         }
+        .main-content {
+            display: flex;
+            flex: 1;
+            position: relative;
+        }
         #map {
             flex: 1;
-            width: 100%;
+            height: calc(100vh - 140px);
+        }
+        #sidebar {
+            width: 300px;
+            background: white;
+            padding: 1rem;
+            overflow-y: auto;
+            border-left: 1px solid #dee2e6;
+            display: none;
+        }
+        .place-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .place-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .place-card h3 {
+            margin: 0 0 0.5rem 0;
+            color: #2c3e50;
+        }
+        .place-card .rating {
+            color: #f39c12;
+            font-weight: bold;
+        }
+        .place-card .topic {
+            display: inline-block;
+            background: #e0f2fe;
+            color: #0369a1;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
         }
         button {
             background: #3498db;
@@ -47,6 +92,219 @@
             padding: 0.5rem 1rem;
             border-radius: 4px;
             cursor: pointer;
+            transition: background 0.3s ease;
+            font-size: 0.9rem;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        button.secondary {
+            background: #95a5a6;
+        }
+        button.secondary:hover {
+            background: #7f8c8d;
+        }
+        select {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            display: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        .similarity-score {
+            font-size: 0.9rem;
+            color: #2ecc71;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Bares de Buenos Aires</h1>
+            <p>Descubre lugares similares con IA</p>
+        </header>
+        <div class="filters">
+            <div class="filter-group">
+                <label for="rating">Rating mínimo:</label>
+                <select id="rating">
+                    <option value="0">Todos</option>
+                    <option value="3">3+ estrellas</option>
+                    <option value="4">4+ estrellas</option>
+                    <option value="4.5">4.5+ estrellas</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="topic">Categoría:</label>
+                <select id="topic">
+                    <option value="all">Todas</option>
+                </select>
+            </div>
+            <button onclick="applyFilters()">Aplicar Filtros</button>
+        </div>
+        <div class="main-content">
+            <div id="map"></div>
+            <div id="sidebar">
+                <h2>Lugares Similares</h2>
+                <div id="similar-places"></div>
+            </div>
+        </div>
+        <div class="loading" id="loading">Cargando...</div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        let map;
+        let markers = [];
+        let currentMarkers = new Map();
+        let topics = {};
+
+        // Inicializar el mapa
+        async function initMap() {
+            map = L.map('map').setView([-34.6037, -58.3816], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Cargar tópicos
+            await loadTopics();
+            await loadReviews();
+        }
+
+        // Cargar tópicos disponibles
+        async function loadTopics() {
+            try {
+                const response = await fetch('/topic_model/topics');
+                topics = await response.json();
+                const topicSelect = document.getElementById('topic');
+                
+                // Limpiar opciones existentes excepto "Todas"
+                while (topicSelect.options.length > 1) {
+                    topicSelect.remove(1);
+                }
+                
+                // Agregar nuevos tópicos
+                Object.entries(topics).forEach(([id, label]) => {
+                    const option = document.createElement('option');
+                    option.value = id;
+                    option.textContent = label;
+                    topicSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error cargando tópicos:', error);
+            }
+        }
+
+        // Cargar reseñas
+        async function loadReviews() {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                const response = await fetch('/reviews/reviews_json');
+                const reviews = await response.json();
+                
+                // Limpiar marcadores existentes
+                markers.forEach(marker => map.removeLayer(marker));
+                markers = [];
+                currentMarkers.clear();
+
+                // Aplicar filtros
+                const ratingFilter = parseFloat(document.getElementById('rating').value);
+                const topicFilter = document.getElementById('topic').value;
+
+                reviews.forEach(review => {
+                    if (review.rating >= ratingFilter && 
+                        (topicFilter === 'all' || review.topic === parseInt(topicFilter))) {
+                        const marker = L.marker([review.lat, review.lon])
+                            .bindPopup(createPopupContent(review))
+                            .on('click', () => showSimilarPlaces(review.place_id));
+                        
+                        markers.push(marker);
+                        currentMarkers.set(review.place_id, marker);
+                        marker.addTo(map);
+                    }
+                });
+            } catch (error) {
+                console.error('Error al cargar las reseñas:', error);
+                alert('Error al cargar las reseñas. Por favor, intenta de nuevo.');
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function createPopupContent(review) {
+            return `
+                <div class="popup-content">
+                    <h3>${review.name}</h3>
+                    <p><strong>Rating:</strong> ${review.rating} ⭐</p>
+                    <p><strong>Categoría:</strong> ${topics[review.topic] || 'Sin clasificar'}</p>
+                    <p>${review.text}</p>
+                    <button onclick="showSimilarPlaces('${review.place_id}')" class="secondary">
+                        Ver lugares similares
+                    </button>
+                </div>
+            `;
+        }
+
+        async function showSimilarPlaces(placeId) {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('sidebar').style.display = 'block';
+                
+                const response = await fetch(`/topic_model/similar/${placeId}`);
+                const similarPlaces = await response.json();
+                
+                const container = document.getElementById('similar-places');
+                container.innerHTML = '';
+                
+                similarPlaces.forEach(place => {
+                    const card = document.createElement('div');
+                    card.className = 'place-card';
+                    card.innerHTML = `
+                        <h3>${place.name}</h3>
+                        <div class="rating">${place.rating} ⭐</div>
+                        <div class="topic">${place.topic}</div>
+                        <div class="similarity-score">
+                            ${Math.round(place.similarity_score * 100)}% similar
+                        </div>
+                    `;
+                    
+                    card.onclick = () => {
+                        const marker = currentMarkers.get(place.place_id);
+                        if (marker) {
+                            map.setView(marker.getLatLng(), 15);
+                            marker.openPopup();
+                        }
+                    };
+                    
+                    container.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Error obteniendo lugares similares:', error);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function applyFilters() {
+            loadReviews();
+        }
+
+        // Inicializar el mapa cuando se carga la página
+        document.addEventListener('DOMContentLoaded', initMap);
+    </script>
+</body>
+</html>
         }
         button:hover {
             background: #2980b9;

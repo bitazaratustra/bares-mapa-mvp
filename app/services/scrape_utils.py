@@ -3,8 +3,8 @@ from app.db.database import get_db
 from app.services.serpapi_client import get_reviews_google_maps
 from app.services.export_reviews import export_reviews_json
 
-def scrape_and_save_reviews(db, query="bares", location="Buenos Aires", num=5):
-    reviews = get_reviews_google_maps(query, location, num)
+def scrape_and_save_reviews(db, query: str ="bares", location: str ="Buenos Aires"):
+    reviews = get_reviews_google_maps(query, location)
     scraped = 0
     for r in reviews:
         review_obj = Review(

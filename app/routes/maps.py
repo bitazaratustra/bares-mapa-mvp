@@ -10,10 +10,13 @@ router = APIRouter()
 def get_reviews_map(
     db: Session = Depends(get_db),
     topic_filter: int | None = Query(None, description="Filtrar por topic"),
+    rating_filter: float | None = Query(None, description="Filtrar por rating mínimo"),
 ):
     query = db.query(Review)
     if topic_filter is not None:
         query = query.filter(Review.topic == topic_filter)
+    if rating_filter is not None:
+        query = query.filter(Review.rating >= rating_filter)
 
     reviews = query.all()
     map_data = defaultdict(list)

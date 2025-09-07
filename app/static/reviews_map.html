@@ -10,19 +10,60 @@
       integrity="sha256-sA+oZb7pFtkpP0uJ4+F2q+3Gg+h4xM3b8yZg2H/3i0s="
       crossorigin=""
     />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
       #map { height: 100vh; }
-      .topic-filter { position: absolute; top: 10px; left: 50px; z-index: 1000; background: white; padding: 5px; }
+      .sidebar {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        background: white;
+        padding: 15px;
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        width: 300px;
+      }
+      .review-card {
+        margin-bottom: 10px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+      .stats {
+        margin-bottom: 15px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+      }
     </style>
 </head>
 <body>
-    <div class="topic-filter">
-        <label>Filtrar topic: 
-            <select id="topicSelect">
-                <option value="">Todos</option>
+    <div class="sidebar">
+        <h4>Bares de Buenos Aires</h4>
+        <div class="stats" id="stats">
+            <p>Cargando estadísticas...</p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Filtrar por topic:</label>
+            <select id="topicSelect" class="form-select">
+                <option value="">Todos los topics</option>
             </select>
-        </label>
-        <button onclick="loadMap()">Filtrar</button>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Filtrar por rating:</label>
+            <select id="ratingSelect" class="form-select">
+                <option value="">Todos los ratings</option>
+                <option value="5">5 estrellas</option>
+                <option value="4">4+ estrellas</option>
+                <option value="3">3+ estrellas</option>
+            </select>
+        </div>
+        <button class="btn btn-primary w-100" onclick="loadMap()">Aplicar Filtros</button>
+        <div class="mt-3">
+            <h6>Reseñas en celda seleccionada:</h6>
+            <div id="reviewsContainer"></div>
+        </div>
     </div>
     <div id="map"></div>
 
@@ -31,21 +72,46 @@
       integrity="sha256-o9N1jV+f8Z+6nHdzX+qg51/3FhC7Ew1+vYkRROqTi1M="
       crossorigin="">
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/h3-js"></script>
     <script>
         const map = L.map('map').setView([-34.60, -58.38], 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
         let currentLayer;
+        let allData = {};
+        let selectedCell = null;
 
-        async function fetchData(topic = "") {
+        async function fetchData(topic = "", rating = "") {
             let url = "/maps";
-            if (topic) url += "?topic_filter=" + topic;
+            const params = new URLSearchParams();
+            if (topic) params.append("topic_filter", topic);
+            if (rating) params.append("rating_filter", rating);
+            
+            if (params.toString()) {
+                url += "?" + params.toString();
+            }
+            
             const res = await fetch(url);
             const data = await res.json();
             return data;
+        }
+
+        async function fetchStats() {
+            const res = await fetch("/reviews/stats");
+            return await res.json();
+        }
+
+        function updateStats(stats) {
+            const statsDiv = document.getElementById("stats");
+            statsDiv.innerHTML = `
+                <p><strong>Total reseñas:</strong> ${stats.total_reviews}</p>
+                <p><strong>Topics encontrados:</strong> ${stats.total_topics}</p>
+                <p><strong>Rating promedio:</strong> ${stats.avg_rating.toFixed(2)}</p>
+            `;
         }
 
         function h3ToPolygon(h3Index) {
@@ -53,9 +119,42 @@
             return boundary.map(coord => [coord[0], coord[1]]);
         }
 
+        function getColorByTopic(topic) {
+            const colors = [
+                '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', 
+                '#00ffff', '#ff7700', '#7700ff', '#ff0077', '#77ff00'
+            ];
+            return topic !== null && topic !== undefined ? colors[topic % colors.length] : '#888888';
+        }
+
+        function showReviewsInCell(h3Index) {
+            const reviews = allData[h3Index] || [];
+            const container = document.getElementById("reviewsContainer");
+            
+            if (reviews.length === 0) {
+                container.innerHTML = "<p>No hay reseñas en esta celda</p>";
+                return;
+            }
+            
+            container.innerHTML = reviews.map(r => `
+                <div class="review-card">
+                    <h6>${r.name}</h6>
+                    <p>${r.text.substring(0, 100)}${r.text.length > 100 ? '...' : ''}</p>
+                    <small>Rating: ${r.rating} | Topic: ${r.topic !== null ? r.topic : 'N/A'}</small>
+                </div>
+            `).join('');
+        }
+
         async function loadMap() {
             const topic = document.getElementById("topicSelect").value;
-            const data = await fetchData(topic);
+            const rating = document.getElementById("ratingSelect").value;
+            
+            const data = await fetchData(topic, rating);
+            allData = data;
+            
+            // Update stats
+            const stats = await fetchStats();
+            updateStats(stats);
 
             // Limpiar capa anterior
             if (currentLayer) {
@@ -66,31 +165,60 @@
             const topicsSet = new Set();
 
             for (const [h3Index, reviews] of Object.entries(data)) {
+                if (reviews.length === 0) continue;
+                
                 const polygon = h3ToPolygon(h3Index);
-                const popupContent = reviews.map(r => `<b>${r.name}</b><br>${r.text}<br>Rating: ${r.rating}`).join("<hr>");
-                L.polygon(polygon, {color: 'blue', weight: 1, fillOpacity: 0.3})
-                    .bindPopup(popupContent)
-                    .addTo(currentLayer);
+                const color = getColorByTopic(reviews[0].topic);
+                
+                const popupContent = `
+                    <div>
+                        <h5>Celda H3: ${h3Index}</h5>
+                        <p><strong>${reviews.length}</strong> reseñas</p>
+                        <p>Topic predominante: ${reviews[0].topic !== null ? reviews[0].topic : 'N/A'}</p>
+                        <button onclick="selectCell('${h3Index}')">Ver reseñas</button>
+                    </div>
+                `;
+                
+                L.polygon(polygon, {
+                    color: color,
+                    weight: 2,
+                    fillOpacity: 0.5
+                })
+                .bindPopup(popupContent)
+                .addTo(currentLayer);
 
                 // Guardamos los topics para el filtro
-                reviews.forEach(r => topicsSet.add(r.topic));
+                reviews.forEach(r => {
+                    if (r.topic !== null) topicsSet.add(r.topic);
+                });
             }
 
             currentLayer.addTo(map);
 
             // Llenar select de topics
             const select = document.getElementById("topicSelect");
-            select.innerHTML = '<option value="">Todos</option>';
-            [...topicsSet].forEach(t => {
+            const currentTopic = select.value;
+            select.innerHTML = '<option value="">Todos los topics</option>';
+            [...topicsSet].sort().forEach(t => {
                 const option = document.createElement("option");
                 option.value = t;
-                option.text = t;
+                option.text = `Topic ${t}`;
+                option.selected = (t == currentTopic);
                 select.appendChild(option);
             });
         }
 
+        function selectCell(h3Index) {
+            selectedCell = h3Index;
+            showReviewsInCell(h3Index);
+            map.closePopup();
+        }
+
         // Cargar mapa inicial
         loadMap();
+        
+        // Actualizar cada 30 segundos
+        setInterval(loadMap, 30000);
     </script>
 </body>
 </html>

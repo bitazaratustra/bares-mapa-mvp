@@ -4,7 +4,10 @@ sqlalchemy
 psycopg2-binary
 requests
 python-dotenv
-bertopic
 h3
-sentence-transformers
 nltk
+numpy<2
+torch
+transformers
+sentence-transformers
+scikit-learn
