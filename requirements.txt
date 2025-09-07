@@ -10,4 +10,4 @@ numpy<2
 torch
 transformers
 sentence-transformers
-scikit-learn
+scikit-learnp
