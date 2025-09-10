@@ -10,6 +10,7 @@
             margin: 0;
             padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            color: #333;
         }
         .container {
             display: flex;
@@ -30,159 +31,308 @@
             align-items: center;
             justify-content: center;
             flex-wrap: wrap;
+            border-bottom: 1px solid #dee2e6;
         }
         .filter-group {
             display: flex;
             align-items: center;
             gap: 0.5rem;
         }
+        .main-content {
+            display: flex;
+            flex: 1;
+            position: relative;
+        }
         #map {
             flex: 1;
-            width: 100%;
+            height: calc(100vh - 140px);
         }
-        button {
-            background: #3498db;
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
+        #sidebar {
+            width: 300px;
+            background: white;
+            padding: 1rem;
+            overflow-y: auto;
+            border-left: 1px solid #dee2e6;
+            display: none;
+        }
+        .place-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
             cursor: pointer;
+            transition: all 0.3s ease;
         }
-        button:hover {
-            background: #2980b9;
+        .place-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        input, select {
-            padding: 0.5rem;
-            border: 1px solid #ddd;
+        .place-card h3 {
+            margin: 0 0 0.5rem 0;
+            color: #2c3e50;
+        }
+        .place-card .rating {
+            color: #f39c12;
+            font-weight: bold;
+        }
+        .place-card .topic {
+            display: inline-block;
+            background: #e0f2fe;
+            color: #0369a1;
+            padding: 0.2rem 0.5rem;
             border-radius: 4px;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            display: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        .similarity-score {
+            font-size: 0.9rem;
+            color: #2ecc71;
+            margin-top: 0.5rem;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Bares BA - Mapa de Reseñas</h1>
-            <p>Visualiza y filtra reseñas de bares en Buenos Aires</p>
+            <h1>Bares de Buenos Aires</h1>
+            <p>Descubre lugares similares con IA</p>
         </header>
         <div class="filters">
             <div class="filter-group">
-                <label for="rating">Rating mínimo:</label>
-                <input type="number" id="rating" min="1" max="5" step="0.5" value="3">
+                <label for="neighborhood">Barrio:</label>
+                <select id="neighborhood">
+                    <option value="">Seleccionar barrio</option>
+                </select>
             </div>
             <div class="filter-group">
-                <label for="searchText">Buscar en reseñas:</label>
-                <input type="text" id="searchText" placeholder="Palabra clave...">
+                <label for="topic">Tópico:</label>
+                <select id="topic">
+                    <option value="">Seleccionar tópico</option>
+                </select>
             </div>
-            <button onclick="applyFilters()">Filtrar</button>
+            <button onclick="searchPlaces()">Buscar</button>
         </div>
-        <div id="map"></div>
+        <div class="main-content">
+            <div id="map"></div>
+            <div id="sidebar">
+                <h2>Lugares Similares</h2>
+                <div id="similar-places"></div>
+            </div>
+        </div>
+        <div class="loading" id="loading">Cargando...</div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script>
-        // Variables globales
-        let map, markers = [], reviews = [];
-        
-        // Inicializar mapa
-        function initMap() {
-            console.log('Inicializando mapa...');
+        let map;
+        let markers = [];
+        let currentMarkers = new Map();
+        let topics = {};
+
+        // Inicializar el mapa
+        async function initMap() {
             map = L.map('map').setView([-34.6037, -58.3816], 12);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
+                attribution: '&copy; OpenStreetMap contributors'
             }).addTo(map);
+
+            // Cargar barrios y tópicos
+            await Promise.all([
+                loadNeighborhoods(),
+                loadTopics()
+            ]);
+        }
+
+        // Cargar barrios disponibles
+        async function loadNeighborhoods() {
+            try {
+                const response = await fetch('/reviews/neighborhoods');
+                const neighborhoods = await response.json();
+                const select = document.getElementById('neighborhood');
+                
+                // Limpiar opciones existentes excepto la primera
+                while (select.options.length > 1) {
+                    select.remove(1);
+                }
+                
+                // Agregar barrios
+                neighborhoods.forEach(neighborhood => {
+                    const option = document.createElement('option');
+                    option.value = neighborhood;
+                    option.textContent = neighborhood;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error cargando barrios:', error);
+            }
+        }
+
+        // Cargar tópicos disponibles
+        async function loadTopics() {
+            try {
+                const response = await fetch('/topic_model/topics');
+                topics = await response.json();
+                const topicSelect = document.getElementById('topic');
+                
+                // Limpiar opciones existentes excepto "Todas"
+                while (topicSelect.options.length > 1) {
+                    topicSelect.remove(1);
+                }
+                
+                // Agregar nuevos tópicos
+                Object.entries(topics).forEach(([id, label]) => {
+                    const option = document.createElement('option');
+                    option.value = id;
+                    option.textContent = label;
+                    topicSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error cargando tópicos:', error);
+            }
+        }
+
+        // Buscar lugares según barrio y tópico
+        async function searchPlaces() {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('similar-places').innerHTML = ''; // Limpiar resultados anteriores
+                
+                const neighborhood = document.getElementById('neighborhood').value;
+                const topic = document.getElementById('topic').value;
+
+                if (!neighborhood || !topic) {
+                    alert('Por favor, selecciona un barrio y un tópico');
+                    return;
+                }
+
+                const response = await fetch('/topic_model/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        neighborhood: neighborhood,
+                        topic: topic
+                    })
+                });
+                const results = await response.json();
+                
+                // Limpiar marcadores existentes
+                markers.forEach(marker => map.removeLayer(marker));
+                markers = [];
+                currentMarkers.clear();
+
+                // Mostrar resultados
+                results.forEach(place => {
+                    const marker = L.marker([place.lat, place.lon])
+                        .bindPopup(createPopupContent(place))
+                        .on('click', () => showSimilarPlaces(place.place_id));
+                    
+                    markers.push(marker);
+                    currentMarkers.set(place.place_id, marker);
+                    marker.addTo(map);
+
+                    // Agregar también al sidebar
+                    const card = document.createElement('div');
+                    card.className = 'place-card';
+                    card.innerHTML = `
+                        <h3>${place.name}</h3>
+                        <div class="rating">${place.rating} ⭐</div>
+                        <div class="topic">${place.topic || 'Sin clasificar'}</div>
+                        <div class="similarity-score">
+                            ${Math.round(place.similarity_score * 100)}% similar a tu búsqueda
+                        </div>
+                    `;
+                    
+                    document.getElementById('similar-places').appendChild(card);
+                });
+
+                // Ajustar vista del mapa si hay marcadores
+                if (markers.length > 0) {
+                    const group = L.featureGroup(markers);
+                    map.fitBounds(group.getBounds());
+                }
+            } catch (error) {
+                console.error('Error al cargar las reseñas:', error);
+                alert('Error al cargar las reseñas. Por favor, intenta de nuevo.');
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function createPopupContent(review) {
+            return `
+                <div class="popup-content">
+                    <h3>${review.name}</h3>
+                    <p><strong>Rating:</strong> ${review.rating} ⭐</p>
+                    <p><strong>Categoría:</strong> ${review.topic || 'Sin clasificar'}</p>
+                    <p>${review.text}</p>
+                    <button onclick="showSimilarPlaces('${review.place_id}')" class="secondary">
+                        Ver lugares similares
+                    </button>
+                </div>
+            `;
+        }
+
+        async function showSimilarPlaces(placeId) {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('sidebar').style.display = 'block';
+                
+                const response = await fetch(`/topic_model/similar/${placeId}`);
+                const similarPlaces = await response.json();
+                
+                const container = document.getElementById('similar-places');
+                container.innerHTML = '';
+                
+                similarPlaces.forEach(place => {
+                    const card = document.createElement('div');
+                    card.className = 'place-card';
+                    card.innerHTML = `
+                        <h3>${place.name}</h3>
+                        <div class="rating">${place.rating} ⭐</div>
+                        <div class="topic">${place.topic || 'Sin clasificar'}</div>
+                        <div class="similarity-score">
+                            ${Math.round(place.similarity_score * 100)}% similar
+                        </div>
+                    `;
+                    
+                    card.onclick = () => {
+                        const marker = currentMarkers.get(place.place_id);
+                        if (marker) {
+                            map.setView(marker.getLatLng(), 15);
+                            marker.openPopup();
+                        }
+                    };
+                    
+                    container.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Error obteniendo lugares similares:', error);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function applyFilters() {
             loadReviews();
         }
 
-        // Cargar reseñas desde la API
-        async function loadReviews() {
-            try {
-                console.log('Cargando reseñas...');
-                const response = await fetch('/reviews/reviews_json');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                console.log('Reseñas cargadas:', data.length);
-                reviews = data;
-                showReviews(reviews);
-            } catch (error) {
-                console.error('Error cargando reseñas:', error);
-                alert('Error cargando reseñas. Por favor, recarga la página.');
-            }
-        }
-
-        // Mostrar reseñas en el mapa
-        function showReviews(reviewsToShow) {
-            console.log(`Mostrando ${reviewsToShow.length} reseñas en el mapa...`);
-            
-            // Limpiar marcadores existentes
-            markers.forEach(m => map.removeLayer(m));
-            markers = [];
-
-            // Agregar nuevos marcadores
-            reviewsToShow.forEach(r => {
-                if (r.lat && r.lon) {
-                    const marker = L.marker([r.lat, r.lon])
-                        .bindPopup(`
-                            <strong>${r.name}</strong><br>
-                            Rating: ${r.rating}<br>
-                            <em>${r.text}</em>
-                        `);
-                    markers.push(marker);
-                    marker.addTo(map);
-                }
-            });
-            
-            // Ajustar el zoom para mostrar todos los marcadores si hay alguno
-            if (markers.length > 0) {
-                const group = L.featureGroup(markers);
-                map.fitBounds(group.getBounds().pad(0.1));
-            }
-        }
-
-        // Aplicar filtros
-        function applyFilters() {
-            console.log('Aplicando filtros...');
-            const minRating = parseFloat(document.getElementById('rating').value) || 0;
-            const searchText = document.getElementById('searchText').value.toLowerCase();
-            console.log('Filtros:', { minRating, searchText });
-            console.log('Total reseñas antes de filtrar:', reviews.length);
-
-            const filtered = reviews.filter(r => {
-                const matchesRating = r.rating >= minRating;
-                const matchesText = !searchText || 
-                    (r.text && r.text.toLowerCase().includes(searchText)) ||
-                    (r.name && r.name.toLowerCase().includes(searchText));
-                return matchesRating && matchesText;
-            });
-
-            console.log('Reseñas filtradas:', filtered.length);
-            showReviews(filtered);
-            
-            // Mostrar feedback al usuario
-            const message = `Mostrando ${filtered.length} resultados de ${reviews.length} reseñas`;
-            document.querySelector('.filters').insertAdjacentHTML('beforeend', 
-                `<div id="filter-result" style="margin-top: 10px; color: #666;">${message}</div>`);
-            
-            // Limpiar el mensaje después de 3 segundos
-            setTimeout(() => {
-                const elem = document.getElementById('filter-result');
-                if (elem) elem.remove();
-            }, 3000);
-        }
-
-        // Agregar listener para la tecla Enter en el campo de búsqueda
-        document.getElementById('searchText').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                applyFilters();
-            }
-        });
-
-        // Iniciar la aplicación
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM cargado, iniciando aplicación...');
-            initMap();
-        });
+        // Inicializar cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', initMap);
     </script>
 </body>
 </html>
