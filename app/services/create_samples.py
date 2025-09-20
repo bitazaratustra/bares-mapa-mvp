@@ -21,13 +21,29 @@ DB_CONFIG = {
 NEIGHBORHOODS = ["Palermo", "Recoleta", "San Telmo", "Belgrano", "Caballito", 
                 "Villa Crespo", "Almagro", "Puerto Madero", "Colegiales", "Chacarita"]
 
-# Nombres de bares y restaurantes
-PLACE_NAMES = [
-    "La Birra Bar", "El Primo", "Don Julio", "La Cabrera", "Cabaña Las Lilas",
-    "Tegui", "Osaka", "Siamo Nel Forno", "La Carnicería", "El Preferido de Palermo",
-    "La Mar", "Parrilla Peña", "El Sanjuanino", "Café Tortoni", "El Obrero",
-    "La Brigada", "El Cuartito", "Las Cuartetas", "El Ateneo", "El Gato Negro"
-]
+# Nombres de bares y restaurantes con sus coordenadas exactas
+PLACES_WITH_COORDINATES = {
+    "La Birra Bar": {"lat": -34.6037, "lon": -58.3816},
+    "El Primo": {"lat": -34.5885, "lon": -58.4304},
+    "Don Julio": {"lat": -34.5897, "lon": -58.4312},
+    "La Cabrera": {"lat": -34.5882, "lon": -58.4301},
+    "Cabaña Las Lilas": {"lat": -34.6086, "lon": -58.3783},
+    "Tegui": {"lat": -34.5889, "lon": -58.4305},
+    "Osaka": {"lat": -34.5893, "lon": -58.4310},
+    "Siamo Nel Forno": {"lat": -34.5888, "lon": -58.4308},
+    "La Carnicería": {"lat": -34.5884, "lon": -58.4303},
+    "El Preferido de Palermo": {"lat": -34.5886, "lon": -58.4306},
+    "La Mar": {"lat": -34.5890, "lon": -58.4309},
+    "Parrilla Peña": {"lat": -34.5891, "lon": -58.4311},
+    "El Sanjuanino": {"lat": -34.5892, "lon": -58.4313},
+    "Café Tortoni": {"lat": -34.6087, "lon": -58.3783},
+    "El Obrero": {"lat": -34.6350, "lon": -58.3810},
+    "La Brigada": {"lat": -34.6200, "lon": -58.3710},
+    "El Cuartito": {"lat": -34.6035, "lon": -58.3815},
+    "Las Cuartetas": {"lat": -34.6036, "lon": -58.3814},
+    "El Ateneo": {"lat": -34.6038, "lon": -58.3817},
+    "El Gato Negro": {"lat": -34.6039, "lon": -58.3818}
+}
 
 # Textos de reseñas de ejemplo
 REVIEW_TEXTS = [
@@ -103,8 +119,8 @@ def create_sample_data():
         conn = psycopg2.connect(**DB_CONFIG)
         cur = conn.cursor()
         
-        # Limpiar tabla existente
-        cur.execute("DELETE FROM reviews;")
+        # TRUNCATE la tabla existente (más eficiente que DELETE) :cite[1]:cite[4]
+        cur.execute("TRUNCATE TABLE reviews RESTART IDENTITY CASCADE;")
         
         # Preparar datos
         all_review_texts = []
@@ -113,14 +129,13 @@ def create_sample_data():
         
         for neighborhood in NEIGHBORHOODS:
             for i in range(5):  # 5 lugares por barrio
-                place_name = random.choice(PLACE_NAMES)
-                min_lat = -34.70
-                max_lat = -34.53
-                min_lon = -58.53
-                max_lon = -58.34
-
-                lat = min_lat + random.random() * (max_lat - min_lat)
-                lon = min_lon + random.random() * (max_lon - min_lon)
+                place_name = random.choice(list(PLACES_WITH_COORDINATES.keys()))
+                
+                # Obtener coordenadas exactas para este lugar
+                coords = PLACES_WITH_COORDINATES[place_name]
+                lat = coords["lat"]
+                lon = coords["lon"]
+                
                 rating = round(random.uniform(3.5, 5.0), 1)
                 review_text = random.choice(REVIEW_TEXTS)
                 
