@@ -114,8 +114,13 @@ def create_sample_data():
         for neighborhood in NEIGHBORHOODS:
             for i in range(5):  # 5 lugares por barrio
                 place_name = random.choice(PLACE_NAMES)
-                lat = -34.58 - random.random() * 0.1  # Coordenadas dentro de CABA
-                lon = -58.43 + random.random() * 0.15
+                min_lat = -34.70
+                max_lat = -34.53
+                min_lon = -58.53
+                max_lon = -58.34
+
+                lat = min_lat + random.random() * (max_lat - min_lat)
+                lon = min_lon + random.random() * (max_lon - min_lon)
                 rating = round(random.uniform(3.5, 5.0), 1)
                 review_text = random.choice(REVIEW_TEXTS)
                 

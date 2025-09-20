@@ -18,6 +18,11 @@ def scrape_and_save_reviews(db, query="bares", location="Buenos Aires", num=5):
         db.add(review_obj)
         scraped += 1
     db.commit()
+    
+    # Calcular embeddings después de scraping
+    from app.services.topic_model_utils import precompute_embeddings
+    precompute_embeddings(db)
+    
     export_reviews_json(db)
     return scraped
 
