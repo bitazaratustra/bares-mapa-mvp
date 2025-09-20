@@ -187,16 +187,4 @@ def find_similar_to_query(db: Session, query: str, neighborhood: str = None, min
         }
         for idx in similar_indices
     ]
-    
-    return [
-        {
-            "place_id": reviews[idx].place_id,
-            "name": reviews[idx].name,
-            "lat": float(reviews[idx].lat) if reviews[idx].lat else None,
-            "lon": float(reviews[idx].lon) if reviews[idx].lon else None,
-            "rating": float(reviews[idx].rating) if reviews[idx].rating else None,
-            "topic": reviews[idx].topic,
-            "similarity_score": float(similarities[idx])
-        }
-        for idx in similar_indices
-    ]
+   

@@ -6,9 +6,18 @@
 init_db:
 	python -c "from app.db.database import engine; from app.db.init_db import Base; Base.metadata.create_all(bind=engine)"
 
+initialize:
+	python -m app.db.create_init_data
+
+samples:
+	python -m app.services.create_samples
+
 # Ejecutar FastAPI
 run:
-	uvicorn app.main:app --reload
+	@echo "Stopping any existing process on port 8000..."
+	-@lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+	@sleep 2
+	uvicorn app.main:app --workers 1 --timeout-keep-alive 30 --reload
 
 # Scrappear reseñas
 scrape:

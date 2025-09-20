@@ -16,8 +16,9 @@ class Review(Base):
     language = Column(String)
     created_at = Column(DateTime)
     source = Column(String)
-    topic = Column(String, nullable=True)
+    topic = Column(Integer, nullable=True)
     h3_index = Column(String, nullable=True)
+    embedding = Column(Text)
 
 DATABASE_URL = "postgresql+psycopg2://esteban:1234@localhost:5432/bares_db"
 engine = create_engine(DATABASE_URL)

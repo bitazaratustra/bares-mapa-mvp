@@ -1,5 +1,4 @@
 from app.db.init_db import Review
-from app.db.database import get_db
 from app.services.serpapi_client import get_reviews_google_maps
 from app.services.export_reviews import export_reviews_json
 
@@ -23,6 +22,7 @@ def scrape_and_save_reviews(db, query="bares", location="Buenos Aires", num=5):
     return scraped
 
 def main():
+    from app.db.database import get_db
     db = next(get_db())
     scraped = scrape_and_save_reviews(db)
     print(f"Reseñas guardadas: {scraped}")
