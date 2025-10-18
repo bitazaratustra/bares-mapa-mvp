@@ -187,4 +187,4 @@ def find_similar_to_query(db: Session, query: str, neighborhood: str = None, min
         }
         for idx in similar_indices
     ]
-   
+

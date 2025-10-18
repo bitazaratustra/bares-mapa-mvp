@@ -1,8 +1,10 @@
 from app.db.init_db import Review
+from app.db.database import get_db
 from app.services.serpapi_client import get_reviews_google_maps
 from app.services.export_reviews import export_reviews_json
 
-def scrape_and_save_reviews(db, query="bares", location="Buenos Aires", num=5):
+def scrape_and_save_reviews(db, query="cervecería buenos aires", location="Buenos Aires", num=15):
+    print(f"[Scraping] Iniciando scraping con num={num}")
     reviews = get_reviews_google_maps(query, location, num)
     scraped = 0
     for r in reviews:
@@ -17,17 +19,15 @@ def scrape_and_save_reviews(db, query="bares", location="Buenos Aires", num=5):
         )
         db.add(review_obj)
         scraped += 1
+        if scraped % 5 == 0:
+            db.commit()  # Commit cada 5 para liberar memoria
+            print(f"[Scraping] {scraped} reseñas guardadas...")
     db.commit()
-    
-    # Calcular embeddings después de scraping
-    from app.services.topic_model_utils import precompute_embeddings
-    precompute_embeddings(db)
-    
     export_reviews_json(db)
+    print(f"[Scraping] Proceso finalizado. Total: {scraped}")
     return scraped
 
 def main():
-    from app.db.database import get_db
     db = next(get_db())
     scraped = scrape_and_save_reviews(db)
     print(f"Reseñas guardadas: {scraped}")

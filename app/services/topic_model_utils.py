@@ -1,23 +1,33 @@
 from typing import List, Dict
+import json
 from sqlalchemy.orm import Session
 from app.db.init_db import Review
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+from sklearn.cluster import KMeans
 import re
 import nltk
-import json
 from nltk.corpus import stopwords
+import numpy as np
 
-# Descargar stopwords si no están disponibles
+# Configuración global
+MODEL_NAME = "paraphrase-MiniLM-L6-v2"  # Modelo con mejor rendimiento pero aún ligero
+BATCH_SIZE = 32  # Para procesar en lotes
+SIMILARITY_THRESHOLD = 0.2  # Umbral más permisivo para mostrar más resultados
+MAX_RESULTS = 20  # Aumentamos el número máximo de resultados
+N_TOPICS = 15  # Número de tópicos para el clustering
+MIN_CLUSTER_SIZE = 3  # Mínimo número de reseñas por cluster
+
+# Inicializar stopwords
 try:
     nltk.data.find('corpora/stopwords')
 except LookupError:
     nltk.download('stopwords')
-
 STOPWORDS = set(stopwords.words("spanish"))
 
 def preprocess(text):
+    """Preprocesa el texto para análisis"""
     if not text:
         return ""
     text = text.lower()
@@ -30,29 +40,53 @@ def preprocess(text):
 model = None
 
 def get_model():
+    """Singleton para el modelo de embeddings"""
     global model
     if model is None:
-        model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+        model = SentenceTransformer(MODEL_NAME)
     return model
 
+def process_in_batches(items, batch_size=BATCH_SIZE):
+    """Procesa una lista en lotes"""
+    for i in range(0, len(items), batch_size):
+        yield items[i:i + batch_size]
+
 def precompute_embeddings(db: Session):
-    """Precompute and store embeddings for all reviews"""
+    """Precomputa embeddings para todas las reseñas usando procesamiento por lotes"""
+    import json
     model = get_model()
     reviews = db.query(Review).filter(Review.text.isnot(None)).all()
     
-    for review in reviews:
-        text = preprocess(f"{review.name} {review.text}")
-        embedding = model.encode(text)
-        review.embedding = json.dumps(embedding.tolist())
+    print(f"[Embeddings] Procesando {len(reviews)} reseñas en lotes de {BATCH_SIZE}...")
+    processed = 0
     
-    db.commit()
-    print(f"Precomputed embeddings for {len(reviews)} reviews")
+    for batch in process_in_batches(reviews, BATCH_SIZE):
+        texts = [preprocess(f"{r.name} {r.text}") for r in batch]
+        embeddings = model.encode(texts)
+        
+        for review, embedding in zip(batch, embeddings):
+            # Convertir el embedding a texto JSON
+            review.embedding = json.dumps(embedding.tolist())
+        
+        db.commit()
+        processed += len(batch)
+        print(f"[Embeddings] {processed}/{len(reviews)} reseñas procesadas")
+
+    print("[Embeddings] Proceso completado")
+    return True
+
 
 def find_similar_to_query(db: Session, query: str, neighborhood: str = None, 
-                         min_rating: float = 4.0, n_similar: int = 10) -> List[Dict]:
-    """Optimized similarity search using precomputed embeddings"""
-    # Filter reviews first
+                         min_rating: float = 0.0, n_similar: int = MAX_RESULTS) -> List[Dict]:
+    """Busca lugares similares a una consulta usando embeddings precomputados"""
+    print(f"[Search] Iniciando búsqueda - Query: '{query}', Barrio: '{neighborhood}', Rating mínimo: {min_rating}")
+    
+    # Filtrar reseñas
     query_obj = db.query(Review).filter(Review.embedding.isnot(None))
+    
+    # Si no hay query, mostrar los mejor valorados
+    if not query or query.strip() == "":
+        query_obj = query_obj.order_by(Review.rating.desc())
     
     if neighborhood and neighborhood != "Todos":
         query_obj = query_obj.filter(Review.name.ilike(f"%{neighborhood}%"))
@@ -60,23 +94,38 @@ def find_similar_to_query(db: Session, query: str, neighborhood: str = None,
         query_obj = query_obj.filter(Review.rating >= min_rating)
     
     reviews = query_obj.all()
+    print(f"[Search] Encontradas {len(reviews)} reseñas que cumplen los filtros")
     
     if not reviews:
         return []
 
-    # Encode query
+    # Si no hay query, devolver los mejores valorados
+    if not query or query.strip() == "":
+        return [{
+            "place_id": r.place_id,
+            "name": r.name,
+            "lat": float(r.lat) if r.lat else None,
+            "lon": float(r.lon) if r.lon else None,
+            "rating": float(r.rating) if r.rating else None,
+            "text": r.text,
+            "topic": r.topic,
+            "similarity_score": 1.0
+        } for r in reviews[:n_similar]]
+
+    # Generar embedding para la consulta
     model = get_model()
-    processed_query = preprocess(query)
-    query_embedding = model.encode([processed_query])[0]
+    query_embedding = model.encode(preprocess(query))
+    print("[Search] Embedding generado para la consulta")
     
-    # Calculate similarities
+    # Calcular similitudes en lotes
     results = []
-    for review in reviews:
-        try:
-            review_embedding = np.array(json.loads(review.embedding))
-            similarity = cosine_similarity([query_embedding], [review_embedding])[0][0]
-            
-            if similarity > 0.3:
+    for batch in process_in_batches(reviews):
+        batch_embeddings = np.array([np.array(json.loads(r.embedding)) for r in batch])
+        similarities = cosine_similarity([query_embedding], batch_embeddings)[0]
+        
+        # Almacenar resultados relevantes
+        for i, (review, similarity) in enumerate(zip(batch, similarities)):
+            if similarity > SIMILARITY_THRESHOLD:
                 results.append({
                     "place_id": review.place_id,
                     "name": review.name,
@@ -87,41 +136,79 @@ def find_similar_to_query(db: Session, query: str, neighborhood: str = None,
                     "topic": review.topic,
                     "similarity_score": float(similarity)
                 })
-        except (json.JSONDecodeError, TypeError) as e:
-            print(f"Error processing embedding for review {review.id}: {e}")
-            continue
     
-    # Return top N results
-    return sorted(results, key=lambda x: x["similarity_score"], reverse=True)[:n_similar]
+    # Ordenar por similitud y retornar los mejores
+    results.sort(key=lambda x: x["similarity_score"], reverse=True)
+    return results[:n_similar]
 
-def run_topic_modeling(db: Session):
-    """Ejecuta modelado de tópicos (opcional para clasificación adicional)"""
-    from bertopic import BERTopic
+def run_topic_modeling(db: Session, n_topics: int = N_TOPICS):
+    """Agrupa reseñas en tópicos usando KMeans sobre embeddings con validación"""
+    print(f"[TopicModeling] Iniciando con {n_topics} tópicos...")
     
-    reviews = db.query(Review).filter(Review.text != None).all()
+    # Obtener reseñas con embeddings
+    reviews = db.query(Review).filter(Review.embedding.isnot(None)).all()
     if not reviews:
-        return None
+        print("[TopicModeling] No hay reseñas con embeddings para procesar")
+        return False
 
-    # Preprocesar textos
-    texts = [preprocess(f"{r.name} {r.text}") for r in reviews]
+    if len(reviews) < n_topics * MIN_CLUSTER_SIZE:
+        adjusted_topics = max(2, len(reviews) // MIN_CLUSTER_SIZE)
+        print(f"[TopicModeling] Ajustando número de tópicos a {adjusted_topics} debido al tamaño de datos")
+        n_topics = adjusted_topics
+
+    # Convertir embeddings a matriz numpy
+    embeddings = np.array([np.array(json.loads(r.embedding)) for r in reviews])
     
-    # Generar embeddings
-    model = get_model()
-    embeddings = model.encode(texts, show_progress_bar=True)
-
-    # Aplicar BERTopic
-    topic_model = BERTopic(language="multilingual")
-    topics, probs = topic_model.fit_transform(texts, embeddings)
+    # Aplicar KMeans con múltiples inicializaciones
+    kmeans = KMeans(n_clusters=n_topics, random_state=42, n_init=10, max_iter=300)
+    labels = kmeans.fit_predict(embeddings)
     
-    # Asignar tópicos a las reseñas
-    for idx, review in enumerate(reviews):
-        topic_idx = topics[idx]
-        topic_words = topic_model.get_topic(topic_idx)
-        if topic_words:
-            topic_label = " | ".join([word for word, _ in topic_words[:3]])
-        else:
-            topic_label = "Sin clasificar"
-        review.topic = topic_label
-
-    db.commit()
-    return topic_model
+    # Encontrar las palabras más representativas por cluster
+    cluster_texts = [[] for _ in range(n_topics)]
+    cluster_sizes = [0] * n_topics
+    for i, review in enumerate(reviews):
+        cluster_texts[labels[i]].append(preprocess(f"{review.name} {review.text}"))
+        cluster_sizes[labels[i]] += 1
+    
+    print("\nDistribución de clusters:")
+    for i, size in enumerate(cluster_sizes):
+        print(f"Cluster {i}: {size} reseñas")
+    
+    # Asignar tópicos y guardar
+    processed = 0
+    for batch_start in range(0, len(reviews), BATCH_SIZE):
+        batch_end = min(batch_start + BATCH_SIZE, len(reviews))
+        batch = reviews[batch_start:batch_end]
+        batch_labels = labels[batch_start:batch_end]
+        
+        for review, label in zip(batch, batch_labels):
+            # Obtener palabras más comunes y significativas del cluster
+            texts_in_cluster = ' '.join(cluster_texts[label])
+            words = texts_in_cluster.split()
+            
+            # Calcular TF-IDF simplificado
+            word_freq = {}
+            for word in set(words):
+                # TF: frecuencia en este cluster
+                tf = words.count(word)
+                # IDF: en cuántos otros clusters aparece
+                other_clusters_with_word = sum(
+                    1 for i in range(n_topics) 
+                    if i != label and word in ' '.join(cluster_texts[i])
+                )
+                # Penalizar palabras que aparecen en muchos clusters
+                significance = tf * (1.0 / (1.0 + other_clusters_with_word))
+                word_freq[word] = significance
+            
+            # Seleccionar las palabras más significativas
+            significant_words = sorted(word_freq.items(), key=lambda x: -x[1])[:4]
+            selected_words = [w for w, _ in significant_words]
+            
+            review.topic = f"Topic {label}: {', '.join(selected_words)}"
+            processed += 1
+            
+        db.commit()
+        print(f"[TopicModeling] {processed}/{len(reviews)} reseñas procesadas")
+    
+    print("[TopicModeling] Proceso completado")
+    return True

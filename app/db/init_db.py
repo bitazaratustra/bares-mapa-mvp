@@ -1,11 +1,11 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Index
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
 class Review(Base):
     __tablename__ = "reviews"
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(Integer, primary_key=True)
     place_id = Column(String, nullable=False)
     name = Column(String)
     lat = Column(Float)
@@ -16,9 +16,16 @@ class Review(Base):
     language = Column(String)
     created_at = Column(DateTime)
     source = Column(String)
-    topic = Column(Integer, nullable=True)
-    h3_index = Column(String, nullable=True)
-    embedding = Column(Text)
+    topic = Column(String)
+    h3_index = Column(String)
+    embedding = Column(Text)  # Almacenado como texto JSON
+
+    # Índices para optimizar búsquedas
+    __table_args__ = (
+        Index('idx_reviews_neighborhood', 'name'),
+        Index('idx_reviews_rating', 'rating'),
+        Index('idx_reviews_topic', 'topic'),
+    )
 
 DATABASE_URL = "postgresql+psycopg2://esteban:1234@localhost:5432/bares_db"
 engine = create_engine(DATABASE_URL)

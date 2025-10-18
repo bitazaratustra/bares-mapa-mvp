@@ -1,11 +1,11 @@
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text, Index
 
 Base = declarative_base()
 
 class Review(Base):
     __tablename__ = "reviews"
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(Integer, primary_key=True)
     place_id = Column(String, nullable=False)
     name = Column(String)
     lat = Column(Float)
@@ -16,5 +16,13 @@ class Review(Base):
     language = Column(String)
     created_at = Column(DateTime)
     source = Column(String)
-    topic = Column(String, nullable=True)
-    h3_index = Column(String, nullable=True)
+    topic = Column(String)
+    h3_index = Column(String)
+    embedding = Column(Text)  # Almacenado como texto JSON
+
+    # Índices para optimizar búsquedas
+    __table_args__ = (
+        Index('idx_reviews_neighborhood', 'name'),
+        Index('idx_reviews_rating', 'rating'),
+        Index('idx_reviews_topic', 'topic'),
+    )

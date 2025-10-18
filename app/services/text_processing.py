@@ -2,6 +2,8 @@ import re
 import unicodedata
 from typing import List
 
+# Preprocesamiento básico de texto
+
 def clean_text(text: str) -> str:
     text = text.lower()
     text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('utf-8')
@@ -11,6 +13,8 @@ def clean_text(text: str) -> str:
 
 def tokenize(text: str) -> List[str]:
     return text.split()
+
+# Ejemplo de pipeline de preprocesamiento
 
 def preprocess_review(text: str) -> List[str]:
     cleaned = clean_text(text)

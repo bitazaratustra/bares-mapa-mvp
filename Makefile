@@ -18,7 +18,8 @@ run:
 
 # Scrapear reseñas (no disponible hasta renovar licencia)
 scrape:
-	@echo "Scraping no disponible - Esperando renovación de licencia"
+	python -m app.services.scrape_utils
+	@echo "Scraping completado y reseñas guardadas en la base de datos"
 
 # Generar topics + H3
 topic:
