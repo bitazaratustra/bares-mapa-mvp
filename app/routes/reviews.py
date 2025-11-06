@@ -11,44 +11,34 @@ router = APIRouter()
 def get_neighborhoods(db: Session = Depends(get_db)):
     """Obtener lista de barrios únicos"""
     try:
-        # Extraer nombres de barrios de los nombres de lugares
-        neighborhoods = db.query(distinct(Review.name)).all()
-        unique_neighborhoods = set()
-        
-        for (name,) in neighborhoods:
-            if not name:
-                continue
-            
-            # Buscar el nombre del barrio en el nombre del lugar
-            barrios = [
-    "Agronomía", "Almagro", "Balvanera", "Barracas", "Belgrano", "Boedo",
-    "Caballito", "Chacarita", "Coghlan", "Colegiales", "Constitución",
-    "Flores", "Floresta", "La Boca", "La Paternal", "Liniers", "Mataderos",
-    "Monte Castro", "Monserrat", "Nueva Pompeya", "Núñez", "Palermo",
-    "Parque Avellaneda", "Parque Chacabuco", "Parque Chas", "Parque Patricios",
-    "Puerto Madero", "Recoleta", "Retiro", "Saavedra", "San Cristóbal",
-    "San Nicolás", "San Telmo", "Vélez Sarsfield", "Versalles", "Villa Crespo",
-    "Villa del Parque", "Villa Devoto", "Villa General Mitre", "Villa Lugano",
-    "Villa Luro", "Villa Ortúzar", "Villa Pueyrredón", "Villa Real",
-    "Villa Riachuelo", "Villa Santa Rita", "Villa Soldati", "Villa Urquiza"
-            ]            
-            for barrio in barrios:
-                if barrio.lower() in name.lower():
-                    unique_neighborhoods.add(barrio)
-                    break
-        
-        return sorted(list(unique_neighborhoods))
+        # Static barrios list to detect mentions in place names/texts. We'll always include 'Todos'.
+        barrios = [
+            "Agronomía", "Almagro", "Balvanera", "Barracas", "Belgrano", "Boedo",
+            "Caballito", "Chacarita", "Coghlan", "Colegiales", "Constitución",
+            "Flores", "Floresta", "La Boca", "La Paternal", "Liniers", "Mataderos",
+            "Monte Castro", "Monserrat", "Nueva Pompeya", "Núñez", "Palermo",
+            "Parque Avellaneda", "Parque Chacabuco", "Parque Chas", "Parque Patricios",
+            "Puerto Madero", "Recoleta", "Retiro", "Saavedra", "San Cristóbal",
+            "San Nicolás", "San Telmo", "Vélez Sarsfield", "Versalles", "Villa Crespo",
+            "Villa del Parque", "Villa Devoto", "Villa General Mitre", "Villa Lugano",
+            "Villa Luro", "Villa Ortúzar", "Villa Pueyrredón", "Villa Real",
+            "Villa Riachuelo", "Villa Santa Rita", "Villa Soldati", "Villa Urquiza"
+        ]
+
+        # Return the full canonical list of barrios (so dropdown always shows all barrios)
+        result = ["Todos"] + sorted(barrios)
+        return result
     except Exception as e:
         print(f"Error obteniendo barrios: {str(e)}")
-        return []
+        return ["Todos"]
 
 @router.get("/scrape")
 def scrape_reviews(
-    query: str = "bares palermo", 
-    location: str = "Palermo, CABA", 
+    query: str = None, 
+    location: str = None, 
     db: Session = Depends(get_db)
 ):
-    scraped = scrape_and_save_reviews(db, query=query, location=location, num=10)
+    scraped = scrape_and_save_reviews(db, query=query, location=location, num=50)
     return {"scraped": scraped}
 
 @router.get("/reviews_json")

@@ -60,7 +60,7 @@ def get_place_reviews(place_id: str) -> List[Dict[str, Any]]:
         return []
 
 
-def get_reviews_google_maps(query: str, location: str, num: int = 10) -> List[Dict[str, Any]]:
+def get_reviews_google_maps(query: str, location: str, num: int ) -> List[Dict[str, Any]]:
     """Return list of reviews from local results via SerpApi.
 
     Note: SerpApi does not allow using both `location` and `ll` together. We use `ll` (center lat/lon)
@@ -80,7 +80,8 @@ def get_reviews_google_maps(query: str, location: str, num: int = 10) -> List[Di
         "ll": "@-34.6037,-58.3816,13z",
         "google_domain": "google.com.ar",
         "gl": "ar",
-        "hl": "es",
+        # Force English UI/text in SerpAPI results
+        "hl": "en",
         "api_key": SERPAPI_KEY,
     }
 

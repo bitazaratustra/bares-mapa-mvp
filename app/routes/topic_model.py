@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
-from requests_cache import Optional
 from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.db.init_db import Review
 from app.services.topic_model_utils import run_topic_modeling, find_similar_to_query
-from typing import List, Dict
+from typing import Optional, List, Dict
 from pydantic import BaseModel
 
 router = APIRouter()

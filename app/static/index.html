@@ -1,17 +1,32 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bares BA - Recomendaciones por Texto</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
     <style>
+        :root{
+            --bg: #f6f8fb;
+            --panel: #ffffff;
+            --muted: #6b7280;
+            --accent: #2563eb;
+            --accent-dark: #1e40af;
+            --border: #e6e9ef;
+            --card-shadow: 0 6px 18px rgba(16,24,40,0.06);
+        }
+        html,body{height:100%;}
         body {
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            color: #333;
+            background: var(--bg);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            color: #111827;
+            -webkit-font-smoothing:antialiased;
+            -moz-osx-font-smoothing:grayscale;
         }
+
+        /* full viewport layout so the map + sidebar sit inside the viewport */
         .container {
             display: flex;
             flex-direction: column;
@@ -24,14 +39,15 @@
             text-align: center;
         }
         .filters {
-            background: #f8f9fa;
-            padding: 1rem;
+            background: var(--panel);
+            padding: 0.75rem 1rem;
             display: flex;
             gap: 1rem;
             align-items: center;
             justify-content: center;
             flex-wrap: wrap;
-            border-bottom: 1px solid #dee2e6;
+            border-bottom: 1px solid var(--border);
+            box-shadow: var(--card-shadow);
         }
         .filter-group {
             display: flex;
@@ -41,58 +57,78 @@
         .filter-group label {
             font-weight: bold;
         }
-        input, select, button {
-            padding: 0.5rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+        input, select {
+            padding: 0.5rem 0.6rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: #fff;
+            min-height: 36px;
         }
         button {
-            background: #3498db;
+            background: linear-gradient(180deg,var(--accent),var(--accent-dark));
             color: white;
             border: none;
+            border-radius: 8px;
+            padding: 0.6rem 0.9rem;
             cursor: pointer;
-            transition: background 0.3s;
+            box-shadow: 0 6px 14px rgba(37,99,235,0.12);
+            transition: transform .12s ease, box-shadow .12s ease;
         }
-        button:hover {
-            background: #2980b9;
-        }
+        button:hover{ transform: translateY(-1px); box-shadow: 0 10px 24px rgba(37,99,235,0.14); }
         .main-content {
             display: flex;
-            flex: 1;
+            flex: 1 1 auto;
             position: relative;
+            min-height: 0; /* allow children to size correctly inside flex */
         }
         #map {
-            flex: 1;
-            height: calc(100vh - 180px);
+            flex: 1 1 auto;
+            min-height: 0;
         }
         #sidebar {
-            width: 300px;
-            background: white;
+            width: 360px;
+            background: var(--panel);
             padding: 1rem;
             overflow-y: auto;
-            border-left: 1px solid #dee2e6;
+            border-left: 1px solid var(--border);
             display: none;
+            align-self: stretch; /* match height of map */
+        }
+        /* vertical carousel style: fixed card heights and scroll inside sidebar */
+        #similar-places {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            padding-right: 0.25rem;
         }
         .place-card {
-            background: white;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 1rem;
+            background: linear-gradient(180deg, #ffffff, #fbfdff);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.85rem;
+            margin: 0;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: transform .12s ease, box-shadow .12s ease;
+            box-shadow: var(--card-shadow);
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 0.5rem;
+            align-items: start;
+            max-height: 140px;
+            overflow: hidden;
         }
-        .place-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
+        .place-card:hover { transform: translateY(-4px); box-shadow: 0 12px 34px rgba(16,24,40,0.12); }
         .place-card h3 {
-            margin: 0 0 0.5rem 0;
-            color: #2c3e50;
+            margin: 0 0 0.25rem 0;
+            color: #0f172a;
+            font-size: 1rem;
+            line-height: 1.2;
         }
         .place-card .rating {
-            color: #f39c12;
-            font-weight: bold;
+            color: #f59e0b;
+            font-weight: 700;
+            font-size: 0.95rem;
+            text-align: right;
         }
         .place-card .topic {
             display: inline-block;
@@ -108,12 +144,13 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(255, 255, 255, 0.95);
-            padding: 1rem 2rem;
+            background: rgba(255, 255, 255, 0.98);
+            padding: 0.9rem 1.25rem;
             border-radius: 8px;
             display: none;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 8px 30px rgba(2,6,23,0.12);
             z-index: 1000;
+            font-weight: 600;
         }
         .similarity-score {
             font-size: 0.9rem;
@@ -121,7 +158,7 @@
             margin-top: 0.5rem;
         }
         .search-input {
-            width: 300px;
+            width: 340px;
         }
         .instructions {
             text-align: center;
@@ -135,41 +172,38 @@
     <div class="container">
         <header>
             <h1>Bares de Buenos Aires</h1>
-            <p>Encuentra lugares similares con búsqueda por texto</p>
+            <p>Find similar places with text search</p>
         </header>
         <div class="filters">
             <div class="filter-group">
-                <label for="neighborhood">Barrio:</label>
-                <select id="neighborhood">
-                    <option value="">Seleccionar barrio</option>
-                </select>
+                <label for="query">Describe what you're looking for:</label>
+                <input type="text" id="query" class="search-input" placeholder="e.g.: good atmosphere, Italian food, craft beer">
             </div>
             <div class="filter-group">
-                <label for="query">Describe lo que buscas:</label>
-                <input type="text" id="query" class="search-input" placeholder="Ej: buen ambiente, comida italiana, cerveza artesanal">
-            </div>
-            <div class="filter-group">
-                <label for="minRating">Rating mínimo:</label>
+                <label for="minRating">Minimum rating:</label>
                 <select id="minRating">
-                    <option value="0">Cualquier rating</option>
-                    <option value="3">3+ estrellas</option>
-                    <option value="4" selected>4+ estrellas</option>
-                    <option value="4.5">4.5+ estrellas</option>
+                    <option value="0">Any rating</option>
+                    <option value="3">3+ stars</option>
+                    <option value="4" selected>4+ stars</option>
+                    <option value="4.5">4.5+ stars</option>
                 </select>
             </div>
             <div class="filter-group">
                 <label>&nbsp;</label>
-                <button onclick="searchPlaces()">Buscar</button>
+                <button onclick="searchPlaces()">Search</button>
             </div>
         </div>
         <div class="main-content">
             <div id="map"></div>
-            <div id="sidebar">
-                <h2>Lugares Recomendados</h2>
+            <aside id="sidebar" aria-label="Recommended places panel">
+                <h2 style="margin:0 0 0.75rem 0;font-size:1.05rem;">Recommended Places</h2>
                 <div id="similar-places"></div>
-            </div>
+            </aside>
         </div>
-        <div class="loading" id="loading">Buscando lugares similares...</div>
+        <div class="loading" id="loading">Searching for similar places...</div>
+        <footer style="background:transparent;padding:0.6rem 1rem;text-align:center;color:var(--muted);border-top:1px solid transparent;">
+            <small>© Bares BA</small>
+        </footer>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -184,33 +218,6 @@
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; OpenStreetMap contributors'
             }).addTo(map);
-
-            // Cargar barrios
-            await loadNeighborhoods();
-        }
-
-        // Cargar barrios disponibles
-        async function loadNeighborhoods() {
-            try {
-                const response = await fetch('/reviews/neighborhoods');
-                const neighborhoods = await response.json();
-                const select = document.getElementById('neighborhood');
-                
-                // Limpiar opciones existentes excepto la primera
-                while (select.options.length > 1) {
-                    select.remove(1);
-                }
-                
-                // Agregar barrios
-                neighborhoods.forEach(neighborhood => {
-                    const option = document.createElement('option');
-                    option.value = neighborhood;
-                    option.textContent = neighborhood;
-                    select.appendChild(option);
-                });
-            } catch (error) {
-                console.error('Error cargando barrios:', error);
-            }
         }
 
         // Buscar lugares según barrio y texto de búsqueda
@@ -219,27 +226,17 @@
                 document.getElementById('loading').style.display = 'block';
                 document.getElementById('similar-places').innerHTML = ''; // Limpiar resultados anteriores
                 
-                const neighborhood = document.getElementById('neighborhood').value;
                 const query = document.getElementById('query').value;
                 const minRating = document.getElementById('minRating').value;
-
-                if (!neighborhood) {
-                    alert('Por favor, selecciona un barrio');
-                    return;
-                }
-
-                if (!query) {
-                    alert('Por favor, describe lo que buscas');
-                    return;
-                }
-
+                // Allow empty query (backend will return top-rated if query is empty)
                 const response = await fetch('/topic_model/search', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
+                    // send both 'topic' and 'query' for compatibility
                     body: JSON.stringify({
-                        neighborhood: neighborhood,
+                        topic: query,
                         query: query,
                         min_rating: parseFloat(minRating)
                     })
@@ -259,7 +256,7 @@
                 // Mostrar resultados
                 if (results.length === 0) {
                     document.getElementById('similar-places').innerHTML = 
-                        '<p>No se encontraron lugares que coincidan con tu búsqueda.</p>';
+                        '<p>No places found matching your search.</p>';
                     return;
                 }
 
@@ -280,10 +277,10 @@
                     card.innerHTML = `
                         <h3>${place.name}</h3>
                         <div class="rating">${place.rating} ⭐</div>
-                        <p>${place.text ? place.text.substring(0, 100) + '...' : 'Sin descripción'}</p>
+                        <p>${place.text ? place.text.substring(0, 100) + '...' : 'No description'}</p>
                         ${place.topic ? `<div class="topic">${place.topic}</div>` : ''}
                         <div class="similarity-score">
-                            ${Math.round(place.similarity_score * 100)}% de coincidencia
+                            ${Math.round(place.similarity_score * 100)}% match
                         </div>
                     `;
                     
@@ -301,8 +298,8 @@
                     map.fitBounds(group.getBounds().pad(0.1));
                 }
             } catch (error) {
-                console.error('Error al buscar lugares:', error);
-                alert('Error al buscar lugares. Por favor, intenta de nuevo.');
+                console.error('Error searching places:', error);
+                alert('Error searching places. Please try again.');
             } finally {
                 document.getElementById('loading').style.display = 'none';
             }
@@ -313,9 +310,9 @@
                 <div class="popup-content">
                     <h3>${place.name}</h3>
                     <p><strong>Rating:</strong> ${place.rating} ⭐</p>
-                    ${place.topic ? `<p><strong>Tópico:</strong> ${place.topic}</p>` : ''}
-                    <p>${place.text || 'Sin descripción'}</p>
-                    <p><strong>Coincidencia:</strong> ${Math.round(place.similarity_score * 100)}%</p>
+                    ${place.topic ? `<p><strong>Topic:</strong> ${place.topic}</p>` : ''}
+                    <p>${place.text || 'No description'}</p>
+                    <p><strong>Match:</strong> ${Math.round(place.similarity_score * 100)}%</p>
                 </div>
             `;
         }

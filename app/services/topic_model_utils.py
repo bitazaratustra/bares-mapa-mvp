@@ -12,8 +12,8 @@ from nltk.corpus import stopwords
 import numpy as np
 
 # Configuración global
-MODEL_NAME = "paraphrase-MiniLM-L6-v2"  # Modelo con mejor rendimiento pero aún ligero
-BATCH_SIZE = 32  # Para procesar en lotes
+MODEL_NAME = "paraphrase-MiniLM-L3-v2"  # Modelo más ligero para máquinas con pocos recursos
+BATCH_SIZE = 8  # Para procesar en lotes (reducido para menor consumo de RAM/CPU)
 SIMILARITY_THRESHOLD = 0.2  # Umbral más permisivo para mostrar más resultados
 MAX_RESULTS = 20  # Aumentamos el número máximo de resultados
 N_TOPICS = 15  # Número de tópicos para el clustering
@@ -43,7 +43,10 @@ def get_model():
     """Singleton para el modelo de embeddings"""
     global model
     if model is None:
-        model = SentenceTransformer(MODEL_NAME)
+        # Force CPU usage and disable tokenizer parallelism to reduce memory spikes
+        import os
+        os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+        model = SentenceTransformer(MODEL_NAME, device='cpu')
     return model
 
 def process_in_batches(items, batch_size=BATCH_SIZE):
@@ -62,11 +65,32 @@ def precompute_embeddings(db: Session):
     
     for batch in process_in_batches(reviews, BATCH_SIZE):
         texts = [preprocess(f"{r.name} {r.text}") for r in batch]
-        embeddings = model.encode(texts)
-        
-        for review, embedding in zip(batch, embeddings):
-            # Convertir el embedding a texto JSON
-            review.embedding = json.dumps(embedding.tolist())
+        try:
+            # Use convert_to_numpy to avoid keeping tensors on GPU and reduce memory
+            embeddings = model.encode(texts, batch_size=BATCH_SIZE, show_progress_bar=False, convert_to_numpy=True, device='cpu')
+            for review, embedding in zip(batch, embeddings):
+                # Convertir el embedding a texto JSON
+                review.embedding = json.dumps(embedding.tolist())
+
+        except MemoryError as me:
+            print(f"[Embeddings] MemoryError durante encode batch: {me}. Intentando en modo seguro (uno a uno)...")
+            for review, txt in zip(batch, texts):
+                try:
+                    emb = model.encode(txt, show_progress_bar=False, convert_to_numpy=True, device='cpu')
+                    review.embedding = json.dumps(emb.tolist())
+                except Exception as e:
+                    print(f"[Embeddings] Error codificando reseña {review.id}: {e}")
+                    continue
+        except Exception as e:
+            # Fallback: try encoding one-by-one which uses less peak memory
+            print(f"[Embeddings] Error durante encode batch: {e}. Reintentando uno a uno...")
+            for review, txt in zip(batch, texts):
+                try:
+                    emb = model.encode(txt, show_progress_bar=False, convert_to_numpy=True, device='cpu')
+                    review.embedding = json.dumps(emb.tolist())
+                except Exception as e2:
+                    print(f"[Embeddings] Error codificando reseña {review.id}: {e2}")
+                    continue
         
         db.commit()
         processed += len(batch)
@@ -126,25 +150,38 @@ def find_similar_to_query(db: Session, query: str, neighborhood: str = None,
         # Almacenar resultados relevantes
         for i, (review, similarity) in enumerate(zip(batch, similarities)):
             if similarity > SIMILARITY_THRESHOLD:
+                # Combine similarity with rating to improve ranking
+                rating = float(review.rating) if review.rating else 0.0
+                rating_norm = rating / 5.0  # normalize to [0,1]
+                # weighted score: 70% similarity, 30% rating
+                combined_score = 0.7 * float(similarity) + 0.3 * rating_norm
                 results.append({
                     "place_id": review.place_id,
                     "name": review.name,
                     "lat": float(review.lat) if review.lat else None,
                     "lon": float(review.lon) if review.lon else None,
-                    "rating": float(review.rating) if review.rating else None,
+                    "rating": rating,
                     "text": review.text,
                     "topic": review.topic,
-                    "similarity_score": float(similarity)
+                    "similarity_score": float(similarity),
+                    "score": float(combined_score)
                 })
     
     # Ordenar por similitud y retornar los mejores
-    results.sort(key=lambda x: x["similarity_score"], reverse=True)
+    # Sort by combined score if present, otherwise similarity
+    results.sort(key=lambda x: x.get("score", x.get("similarity_score", 0.0)), reverse=True)
     return results[:n_similar]
 
 def run_topic_modeling(db: Session, n_topics: int = N_TOPICS):
     """Agrupa reseñas en tópicos usando KMeans sobre embeddings con validación"""
     print(f"[TopicModeling] Iniciando con {n_topics} tópicos...")
     
+    # Asegurarse de que todas las reseñas tienen embeddings
+    missing_count = db.query(Review).filter(Review.text.isnot(None), Review.embedding.is_(None)).count()
+    if missing_count > 0:
+        print(f"[TopicModeling] Encontradas {missing_count} reseñas sin embeddings. Precomputando embeddings antes de modelar...")
+        precompute_embeddings(db)
+
     # Obtener reseñas con embeddings
     reviews = db.query(Review).filter(Review.embedding.isnot(None)).all()
     if not reviews:

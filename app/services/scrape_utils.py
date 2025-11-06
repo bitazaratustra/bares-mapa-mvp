@@ -3,7 +3,7 @@ from app.db.database import get_db
 from app.services.serpapi_client import get_reviews_google_maps
 from app.services.export_reviews import export_reviews_json
 
-def scrape_and_save_reviews(db, query="cervecería buenos aires", location="Buenos Aires", num=15):
+def scrape_and_save_reviews(db, query="pub", location="Buenos Aires", num: int = 50):
     print(f"[Scraping] Iniciando scraping con num={num}")
     reviews = get_reviews_google_maps(query, location, num)
     scraped = 0
