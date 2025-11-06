@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from requests_cache import Optional
 from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.db.init_db import Review
@@ -9,9 +10,10 @@ from pydantic import BaseModel
 router = APIRouter()
 
 class SearchRequest(BaseModel):
-    neighborhood: str | None = None
-    topic: str | None = None
-    min_rating: float | None = None
+    neighborhood: Optional[str] = None
+    topic: Optional[str] = None
+    query: Optional[str] = None
+    min_rating: Optional[float] = None
 
 @router.post("/search")
 def search_places(request: SearchRequest, db: Session = Depends(get_db)):
@@ -20,7 +22,7 @@ def search_places(request: SearchRequest, db: Session = Depends(get_db)):
     """
     try:
         # Preparar la consulta base
-        query = request.topic if request.topic else ""
+        query = request.query or request.topic or ""
         neighborhood = request.neighborhood if request.neighborhood and request.neighborhood != "Todos" else None
         min_rating = request.min_rating if request.min_rating else 0.0
         
@@ -112,3 +114,4 @@ def get_similar_places_endpoint(
             status_code=500,
             detail=f"Error obteniendo lugares similares: {str(e)}"
         )
+        

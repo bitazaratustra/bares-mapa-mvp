@@ -16,12 +16,22 @@ def get_neighborhoods(db: Session = Depends(get_db)):
         unique_neighborhoods = set()
         
         for (name,) in neighborhoods:
-            # Buscar el nombre del barrio en el nombre del lugar
-            barrios = ["Palermo", "Recoleta", "San Telmo", "Belgrano", "Caballito", 
-                      "Villa Crespo", "Almagro", "Puerto Madero", "San Nicolás", 
-                      "Monserrat", "Villa Urquiza", "Núñez", "Colegiales", "Chacarita",
-                      "Villa Ortúzar", "Boedo", "Barracas", "La Boca", "Flores"]
+            if not name:
+                continue
             
+            # Buscar el nombre del barrio en el nombre del lugar
+            barrios = [
+    "Agronomía", "Almagro", "Balvanera", "Barracas", "Belgrano", "Boedo",
+    "Caballito", "Chacarita", "Coghlan", "Colegiales", "Constitución",
+    "Flores", "Floresta", "La Boca", "La Paternal", "Liniers", "Mataderos",
+    "Monte Castro", "Monserrat", "Nueva Pompeya", "Núñez", "Palermo",
+    "Parque Avellaneda", "Parque Chacabuco", "Parque Chas", "Parque Patricios",
+    "Puerto Madero", "Recoleta", "Retiro", "Saavedra", "San Cristóbal",
+    "San Nicolás", "San Telmo", "Vélez Sarsfield", "Versalles", "Villa Crespo",
+    "Villa del Parque", "Villa Devoto", "Villa General Mitre", "Villa Lugano",
+    "Villa Luro", "Villa Ortúzar", "Villa Pueyrredón", "Villa Real",
+    "Villa Riachuelo", "Villa Santa Rita", "Villa Soldati", "Villa Urquiza"
+            ]            
             for barrio in barrios:
                 if barrio.lower() in name.lower():
                     unique_neighborhoods.add(barrio)
