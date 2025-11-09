@@ -1,6 +1,6 @@
 import folium
 import pandas as pd
-from app.db.init_db import Review
+from app.models.review import Review
 from sqlalchemy.orm import Session
 from app.db.database import get_db
 

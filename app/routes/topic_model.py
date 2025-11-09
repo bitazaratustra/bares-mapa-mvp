@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.database import get_db
-from app.db.init_db import Review
-from app.services.topic_model_utils import run_topic_modeling, find_similar_to_query
+from app.models.review import Review
+from app.services.topic_model import run_topic_modeling, find_similar_to_query
 from typing import Optional, List, Dict
 from pydantic import BaseModel
 
@@ -85,7 +85,7 @@ def get_similar_places_endpoint(
     Retorna lugares similares para un lugar específico basado en su ID
     """
     try:
-        from app.services.topic_model_utils import get_similar_reviews
+        from app.services.topic_model import get_similar_reviews
         
         similar_places = get_similar_reviews(db, review_id)
         

@@ -1,5 +1,5 @@
 import json
-from app.db.init_db import Review
+from app.models.review import Review
 
 def export_reviews_json(db):
     reviews = db.query(Review).all()

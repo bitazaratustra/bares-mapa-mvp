@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.db.database import get_db
-from app.db.init_db import Review
+from app.models.review import Review
 from collections import defaultdict
 
 router = APIRouter()

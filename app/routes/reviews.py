@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import distinct
+import json
 from app.db.database import get_db
-from app.db.init_db import Review
+from app.models.review import Review
 from app.services.scrape_utils import scrape_and_save_reviews
 
 router = APIRouter()
@@ -43,9 +44,6 @@ def scrape_reviews(
 
 @router.get("/reviews_json")
 async def get_reviews_json(db: Session = Depends(get_db)):
-    from app.db.init_db import Review
-    import json
-    
     try:
         # Obtener reviews de la base de datos
         reviews = db.query(Review).all()

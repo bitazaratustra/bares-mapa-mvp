@@ -1,4 +1,4 @@
-from app.db.init_db import Review
+from app.models.review import Review
 from app.db.database import get_db
 from app.services.serpapi_client import get_reviews_google_maps
 from app.services.export_reviews import export_reviews_json

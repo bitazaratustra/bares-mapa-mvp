@@ -27,13 +27,7 @@ pip install -r requirements.txt
 
 ## 2. Restaurar el Sistema
 
-### 2.1 Probar el flujo completo
-```bash
-# Ejecutar script de prueba
-python test_flow.py
-```
-
-### 2.2 Iniciar el servidor
+### 2.1 Iniciar el servidor
 ```bash
 # Usando make
 make run
@@ -81,7 +75,6 @@ make embeddings
 ### 5.1 Principales Endpoints
 - GET /maps: Visualización de reseñas en mapa
 - POST /topic_model/search: Búsqueda por similitud
-- GET /reviews/neighborhoods: Lista de barrios disponibles
 - GET /topic_model/topics: Lista de tópicos disponibles
 
 ### 5.2 Uso del Frontend

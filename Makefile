@@ -23,11 +23,11 @@ scrape:
 
 # Generar topics + H3
 topic:
-	python -c "from app.db.database import get_db; from app.services.topic_model_utils import run_topic_modeling; db = next(get_db()); run_topic_modeling(db); print('Topic modeling completado')"
+	python -c "from app.db.database import get_db; from app.services.topic_model import run_topic_modeling; db = next(get_db()); run_topic_modeling(db); print('Topic modeling completado')"
 
 # Precalcular embeddings
 embeddings:
-	python -c "from app.db.database import get_db; from app.services.topic_model_utils import precompute_embeddings; db = next(get_db()); precompute_embeddings(db); print('Embeddings precomputados')"
+	python -c "from app.db.database import get_db; from app.services.topic_model import precompute_embeddings; db = next(get_db()); precompute_embeddings(db); print('Embeddings precomputados')"
 
 # Proceso completo de setup
 full_setup: init_db samples topic embeddings
