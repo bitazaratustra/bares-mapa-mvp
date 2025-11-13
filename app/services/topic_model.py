@@ -3,7 +3,6 @@ import json
 from sqlalchemy.orm import Session
 from app.models.review import Review
 from sentence_transformers import SentenceTransformer
-from bertopic import BERTopic
 from sklearn.cluster import KMeans
 from sklearn.metrics.pairwise import cosine_similarity
 from collections import defaultdict
@@ -12,13 +11,13 @@ import h3
 from app.services.text_processing import preprocess_review
 
 # Global configuration
-MODEL_NAME = "paraphrase-MiniLM-L3-v2"  # Lightweight model for resource-constrained environments
-BATCH_SIZE = 8  # Process in small batches to manage memory
-SIMILARITY_THRESHOLD = 0.2  # Permissive threshold for more results
-MAX_RESULTS = 20  # Maximum number of similar places to return
-N_TOPICS = 15  # Default number of topics
-MIN_CLUSTER_SIZE = 3  # Minimum reviews per cluster
-DEFAULT_N_SIMILAR = 10  # Default number of similar items to return
+MODEL_NAME = "paraphrase-MiniLM-L3-v2" 
+BATCH_SIZE = 8  
+SIMILARITY_THRESHOLD = 0.2  
+MAX_RESULTS = 20 
+N_TOPICS = 15  
+MIN_CLUSTER_SIZE = 3  
+DEFAULT_N_SIMILAR = 10  
 
 # Model singleton to avoid reloading
 _model = None

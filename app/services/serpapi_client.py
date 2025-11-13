@@ -76,11 +76,9 @@ def get_reviews_google_maps(query: str, location: str, num: int ) -> List[Dict[s
         "engine": "google_maps",
         "q": q,
         "type": "search",
-        # Use lat/lon center rather than 'location' parameter to avoid SerpAPI conflict
         "ll": "@-34.6037,-58.3816,13z",
         "google_domain": "google.com.ar",
         "gl": "ar",
-        # Force English UI/text in SerpAPI results
         "hl": "en",
         "api_key": SERPAPI_KEY,
     }

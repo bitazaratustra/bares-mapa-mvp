@@ -16,7 +16,7 @@ samples:
 run:
 	uvicorn app.main:app --workers 1 --timeout-keep-alive 30 --reload
 
-# Scrapear reseñas (no disponible hasta renovar licencia)
+# Scrapear reseñas 
 scrape:
 	python -m app.services.scrape_utils
 	@echo "Scraping completado y reseñas guardadas en la base de datos"
@@ -30,7 +30,7 @@ embeddings:
 	python -c "from app.db.database import get_db; from app.services.topic_model import precompute_embeddings; db = next(get_db()); precompute_embeddings(db); print('Embeddings precomputados')"
 
 # Proceso completo de setup
-full_setup: init_db samples topic embeddings
+full_setup: init_db samples embeddings topic
 	@echo "Setup completo realizado"
 
 # Limpiar archivos generados
@@ -54,8 +54,9 @@ clean:
 
 # Para scraping real :
 
-# make init_db # Inicializar la base de datos (crear tablas)
-# make scrape  # Reemplazará los datos de ejemplo con datos reales
-# make topic   # Re-ejecutar el modelado de tópicos con datos reales
-# make embeddings  # Re-calcular embeddings con datos reales
-# make run     # Reiniciar la aplicación
+# make init_db    # 1. Inicializar la base de datos (crear tablas)
+# make scrape     # 2. Reemplazar con datos reales (scraping)
+# make embeddings # 3. Calcular embeddings de los textos
+# make topic      # 4. Generar tópicos usando los embeddings
+# make run        # 5. Reiniciar la aplicación
+
