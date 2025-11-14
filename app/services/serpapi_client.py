@@ -34,7 +34,7 @@ def _build_session(retries: int = 3, backoff: float = 1.0) -> requests.Session:
 
 
 def get_place_reviews(place_id: str) -> List[Dict[str, Any]]:
-    """Fetch reviews for a specific Google Maps place via SerpApi."""
+    """Trae reseñas de un lugar específico de Google Maps vía SerpApi."""
     if not _check_api_key():
         return []
 
@@ -69,7 +69,6 @@ def get_reviews_google_maps(query: str, location: str, num: int ) -> List[Dict[s
     if not _check_api_key():
         return []
 
-    # Build a query string that includes the location to bias results
     q = f"{query} {location or 'CABA'}"
 
     params = {
@@ -110,7 +109,7 @@ def get_reviews_google_maps(query: str, location: str, num: int ) -> List[Dict[s
         lat = gps.get("latitude")
         lon = gps.get("longitude")
 
-        # Filter by approximate Buenos Aires bounding box
+
         if lat is not None and lon is not None:
             try:
                 lat = float(lat)
@@ -126,7 +125,7 @@ def get_reviews_google_maps(query: str, location: str, num: int ) -> List[Dict[s
                 print(f"[Debug] Descartando {name} - fuera de Buenos Aires")
                 continue
 
-        # Fetch place reviews
+
         try:
             place_reviews = get_place_reviews(place_id)
             print(f"[Debug] Reseñas encontradas para {name}: {len(place_reviews)}")

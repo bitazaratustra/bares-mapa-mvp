@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 .env
 app/static/reviews.json
+datos_leb.csv
