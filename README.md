@@ -8,7 +8,6 @@ Este proyecto es un MVP desarrollado con FastAPI, PostgreSQL y técnicas de NLP 
 - 🤖 **Procesamiento de texto**: Análisis de reseñas usando embeddings de lenguaje
 - 🔍 **Búsqueda semántica**: Encuentra lugares similares usando similitud coseno
 - 📊 **Agrupación por tópicos**: Agrupa lugares por temáticas comunes
-- 🏙️ **Filtrado por barrios**: Explora lugares por zonas de Buenos Aires
 
 ## 🛠️ Requisitos Técnicos
 
