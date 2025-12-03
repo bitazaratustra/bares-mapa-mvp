@@ -18,9 +18,9 @@ class Review(Base):
     source = Column(String)
     topic = Column(String)
     h3_index = Column(String)
-    embedding = Column(Text)  # Almacenado como texto JSON
+    embedding = Column(Text)  
 
-    # Índices para optimizar búsquedas
+    
     __table_args__ = (
         Index('idx_reviews_neighborhood', 'name'),
         Index('idx_reviews_rating', 'rating'),

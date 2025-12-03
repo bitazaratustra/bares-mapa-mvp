@@ -34,7 +34,7 @@ def scrape_and_save_reviews(db, query="pub", location="Buenos Aires", num: int =
             db.add(review_obj)
             scraped += 1
             if scraped % 5 == 0:
-                db.commit()  # Commit cada 5 para liberar memoria
+                db.commit()  
                 print(f"[Scraping] {scraped} reseñas guardadas...")
         except Exception as e:
             print(f"[Scraping] Error guardando reseña: {e}")

@@ -4,13 +4,13 @@ from typing import List, Set
 import nltk
 from nltk.corpus import stopwords
 
-# Initialize NLTK resources
+
 try:
     nltk.data.find('corpora/stopwords')
 except LookupError:
     nltk.download('stopwords')
 
-# Get English stopwords, fallback to basic set if NLTK fails
+
 try:
     STOPWORDS: Set[str] = set(stopwords.words("english"))
 except Exception:

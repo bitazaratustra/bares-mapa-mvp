@@ -12,7 +12,7 @@ router = APIRouter()
 def get_neighborhoods(db: Session = Depends(get_db)):
     """Obtener lista de barrios únicos"""
     try:
-        # Static barrios list to detect mentions in place names/texts. We'll always include 'Todos'.
+
         barrios = [
             "Agronomía", "Almagro", "Balvanera", "Barracas", "Belgrano", "Boedo",
             "Caballito", "Chacarita", "Coghlan", "Colegiales", "Constitución",
@@ -26,7 +26,7 @@ def get_neighborhoods(db: Session = Depends(get_db)):
             "Villa Riachuelo", "Villa Santa Rita", "Villa Soldati", "Villa Urquiza"
         ]
 
-        # Return the full canonical list of barrios (so dropdown always shows all barrios)
+        
         result = ["Todos"] + sorted(barrios)
         return result
     except Exception as e:
@@ -45,7 +45,7 @@ def scrape_reviews(
 @router.get("/reviews_json")
 async def get_reviews_json(db: Session = Depends(get_db)):
     try:
-        # Obtener reviews de la base de datos
+        
         reviews = db.query(Review).all()
         reviews_list = []
         
@@ -62,7 +62,7 @@ async def get_reviews_json(db: Session = Depends(get_db)):
                 "h3_index": review.h3_index
             })
         
-        # Guardar en archivo para cache
+        
         with open("app/static/reviews.json", "w", encoding="utf-8") as f:
             json.dump(reviews_list, f, ensure_ascii=False, indent=2)
         

@@ -20,12 +20,12 @@ def search_places(request: SearchRequest, db: Session = Depends(get_db)):
     Busca lugares según el barrio y el tópico seleccionado
     """
     try:
-        # Preparar la consulta base
+        
         query = request.query or request.topic or ""
         neighborhood = request.neighborhood if request.neighborhood and request.neighborhood != "Todos" else None
         min_rating = request.min_rating if request.min_rating else 0.0
         
-        # Usar la función de búsqueda semántica
+        
         results = find_similar_to_query(
             db=db,
             query=query,
@@ -36,7 +36,7 @@ def search_places(request: SearchRequest, db: Session = Depends(get_db)):
         return results
         
     except Exception as e:
-        print(f"Error en búsqueda: {str(e)}")  # Log para debugging
+        print(f"Error en búsqueda: {str(e)}")  
         raise HTTPException(
             status_code=500,
             detail=f"Error en la búsqueda: {str(e)}"
@@ -60,12 +60,12 @@ def run_topic_modeling_endpoint(db: Session = Depends(get_db)):
 def get_topics(db: Session = Depends(get_db)):
     """Retorna la lista de tópicos disponibles"""
     try:
-        # Obtener tópicos únicos de la base de datos
+        
         topics = db.query(Review.topic).distinct().filter(Review.topic.isnot(None)).all()
         topics_dict = {}
         for i, (topic,) in enumerate(topics):
             if topic:
-                # Limpiar el topic (por si viene con caracteres especiales)
+                
                 clean_topic = topic.strip()
                 if clean_topic:
                     topics_dict[str(i)] = clean_topic
